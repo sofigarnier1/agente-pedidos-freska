@@ -34,7 +34,8 @@ Cómo trabajás:
 - Si un nombre coincide con más de un producto (por ejemplo "milanesas" o "chorizos"), preguntá cuál.
 - Las milanesas y los chorizos van por kilo; las hamburguesas y la picada, por unidad. Si la cantidad no cierra con la unidad, preguntá.
 - Si falta la cantidad o la fecha de entrega, preguntalo. Si algo del pedido no lo vendemos, avisá y preguntá si sigue con el resto antes de armarlo.
-- Cuando esté todo claro, llamá a armar_pedido. Si devuelve errores, explicáselos al cliente con tus palabras.
+- En cuanto tengas producto, cantidad y fecha de entrega, llamá a armar_pedido sin pedir confirmación: el cliente ve el pedido armado en pantalla y lo revisa ahí. Si devuelve errores, explicáselos al cliente con tus palabras.
+- Las fechas como "el 20" o "el 25/11" son el día de ese mes (o el próximo mes si ya pasó); no vuelvas a preguntarlas.
 - Para algo que no sea un pedido de FRESKA, decí amablemente que solo tomás pedidos.
 Respondé en español rioplatense, corto (dos o tres oraciones), sin listas largas ni emojis."""
 
@@ -46,7 +47,7 @@ def _con_modelo(mensaje, cliente_id, hoy, historial):
     client = anthropic.Anthropic()
     mensajes = [{"role": "user" if h["rol"] == "cliente" else "assistant", "content": h["texto"]} for h in historial]
     mensajes.append({"role": "user", "content": mensaje})
-    pedido, llamadas = None, []
+    pedido, llamadas, pasos = None, [], []
     for _ in range(MAX_VUELTAS):
         r = client.messages.create(
             model=MODELO, max_tokens=4000, system=_sistema(cliente, hoy),
@@ -54,23 +55,24 @@ def _con_modelo(mensaje, cliente_id, hoy, historial):
             output_config={"effort": ESFUERZO},
         )
         if r.stop_reason == "refusal":
-            return {"texto": "Perdón, eso no lo puedo tomar por acá. Escribinos por WhatsApp.", "pedido": None, "herramientas": llamadas}
+            return {"texto": "Perdón, eso no lo puedo tomar por acá. Escribinos por WhatsApp.", "pedido": None, "herramientas": llamadas, "pasos": pasos}
         usos = [b for b in r.content if b.type == "tool_use"]
         if r.stop_reason != "tool_use" or not usos:
             texto = "".join(b.text for b in r.content if b.type == "text").strip()
-            return {"texto": texto, "pedido": pedido, "herramientas": llamadas}
+            return {"texto": texto, "pedido": pedido, "herramientas": llamadas, "pasos": pasos}
         mensajes.append({"role": "assistant", "content": r.content})
         resultados = []
         for u in usos:
             salida = H.ejecutar(u.name, u.input, cliente_id, hoy)
             llamadas.append(u.name)
+            pasos.append(H.paso(u.name, u.input, salida))
             if u.name == "armar_pedido" and salida.get("ok"):
                 pedido = salida["pedido"]
             resultados.append({"type": "tool_result", "tool_use_id": u.id,
                                "content": json.dumps(salida, ensure_ascii=False),
                                "is_error": salida.get("ok") is False})
         mensajes.append({"role": "user", "content": resultados})
-    return {"texto": "Se me complicó armarlo. ¿Me lo pasás de nuevo más simple?", "pedido": pedido, "herramientas": llamadas}
+    return {"texto": "Se me complicó armarlo. ¿Me lo pasás de nuevo más simple?", "pedido": pedido, "herramientas": llamadas, "pasos": pasos}
 
 
 # ==================================================================== modo reglas
@@ -271,6 +273,7 @@ def responder(mensaje, cliente_id="1", hoy=None, modo=None, historial=None):
         # Sin IA no hay memoria real: se leen juntos los mensajes del cliente de esta charla.
         previos = [h["texto"] for h in historial if h["rol"] == "cliente"][-3:]
         salida = _con_reglas(" ".join([*previos, mensaje]), cliente_id, hoy)
+    salida.setdefault("pasos", [{"herramienta": n, "ok": None} for n in salida.get("herramientas", [])])
     return {**salida, "modo": modo}
 
 

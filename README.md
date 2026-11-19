@@ -37,7 +37,7 @@ python3 agente/evaluacion/evaluar.py --modelo  # con Claude (pip install anthrop
 
 Resultado actual:
 - **Modo reglas: 30/30.** Ojo con este número: las reglas las ajusté mirando estas mismas pruebas, así que no mide nada nuevo. Con frases que no estaban en la evaluación acierta menos, y cuando no entiende algo pregunta en vez de inventar.
-- **Modo modelo: pendiente.** Se corre cuando esté cargada la clave, y el número que salga va acá, sea el que sea.
+- **Modo modelo (Claude Haiku 5.5): 28/30 (93 %).** Corrida del 17/11/2026, resultados en `agente/evaluacion/resultados-modelo.json`. Las dos que fallaron ("10 piscinas" y "milanesas de soja") no son errores de precio ni de pedido: el agente dijo que no las vende, pero con otras palabras que las que busca la prueba. Lo cuento así y no lo retoco para llegar al 100 %.
 
 ## Probarlo
 

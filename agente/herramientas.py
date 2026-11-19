@@ -158,6 +158,26 @@ DEFINICIONES = [
 ]
 
 
+def paso(nombre, entrada, salida):
+    """Resumen corto de una llamada a herramienta, para mostrarlo en la demo (sin precios inventados: salen de la salida real)."""
+    p = {"herramienta": nombre, "ok": salida.get("ok", bool(salida.get("encontrados")))}
+    if nombre == "buscar_producto":
+        p["buscado"] = str(entrada.get("texto", ""))[:60]
+        p["encontrados"] = [x["nombre"] for x in salida.get("encontrados", [])]
+    elif nombre == "calcular_total":
+        if salida.get("ok"):
+            p["total"] = salida["total"]
+            p["lineas"] = len(salida["lineas"])
+        else:
+            p["errores"] = salida.get("errores", [])[:2]
+    elif nombre == "armar_pedido":
+        if salida.get("ok"):
+            p["total"] = salida["pedido"]["total"]
+        else:
+            p["errores"] = salida.get("errores", [])[:2]
+    return p
+
+
 def ejecutar(nombre, entrada, cliente_id, hoy):
     """Corre una herramienta con lo que pidió el modelo. El cliente y la fecha de hoy los pone el código."""
     if nombre == "buscar_producto":
